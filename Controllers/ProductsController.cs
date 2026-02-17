@@ -40,6 +40,9 @@ namespace FirstProject.Api.Controllers
         [HttpPost]
         public async Task<ActionResult<Product>> CreateProduct(Product product)
         {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
             _context.Products.Add(product);
             await _context.SaveChangesAsync();
             return CreatedAtAction(nameof(GetProduct), new { id = product.Id }, product);
@@ -50,12 +53,29 @@ namespace FirstProject.Api.Controllers
         public async Task<IActionResult> UpdateProduct(int id, Product product)
         {
             if (id != product.Id)
-                return BadRequest();
+                return BadRequest("ID mismatch");
 
-            _context.Entry(product).State = EntityState.Modified;
-            await _context.SaveChangesAsync();
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            try
+            {
+                _context.Entry(product).State = EntityState.Modified;
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                if (!await ProductExists(id))
+                    return NotFound();
+                throw;
+            }
 
             return NoContent();
+        }
+
+        private async Task<bool> ProductExists(int id)
+        {
+            return await _context.Products.AnyAsync(e => e.Id == id);
         }
 
         // DELETE api/<ProductController>/5
